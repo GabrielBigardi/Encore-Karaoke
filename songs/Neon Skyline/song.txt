@@ -1,0 +1,44 @@
+#TITLE:Neon Skyline
+#ARTIST:Encore Originals
+#MP3:instrumental.wav
+#BPM:108
+#GAP:3000
+#GENRE:Synth pop
+#LANGUAGE:English
+: 0 6 64 Un
+: 7 6 67 der 
+: 14 6 69 the 
+: 21 6 67 ci
+: 28 6 64 ty 
+: 35 6 62 li
+: 42 6 64 g
+: 49 9 67 hts 
+- 61
+: 64 6 64 We 
+: 71 6 67 let 
+: 78 6 69 our 
+: 85 6 67 vo
+: 92 6 64 i
+: 99 6 62 ces 
+: 106 6 64 ri
+* 113 9 67 se 
+- 125
+: 128 6 64 C
+: 135 6 67 a
+: 142 6 69 rry 
+: 149 6 67 the 
+: 156 6 64 ni
+: 163 6 62 ght 
+: 170 6 64 aw
+: 177 9 67 ay 
+- 189
+: 192 6 64 Si
+: 199 6 67 ng 
+: 206 6 69 till 
+: 213 6 67 a 
+: 220 6 64 br
+: 227 6 62 and 
+: 234 6 64 new 
+* 241 9 67 day 
+- 253
+E

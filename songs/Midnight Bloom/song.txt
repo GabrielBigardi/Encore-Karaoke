@@ -1,0 +1,44 @@
+#TITLE:Midnight Bloom
+#ARTIST:Encore Originals
+#MP3:instrumental.wav
+#BPM:120
+#GAP:3000
+#GENRE:Indie electronic
+#LANGUAGE:English
+: 0 6 62 St
+: 7 6 65 ars 
+: 14 6 69 in 
+: 21 6 72 the 
+: 28 6 69 ve
+: 35 6 67 l
+: 42 6 65 vet 
+: 49 9 62 blue 
+- 61
+: 64 6 62 A
+: 71 6 65 ll 
+: 78 6 69 of 
+: 85 6 72 the 
+: 92 6 69 li
+: 99 6 67 ght 
+: 106 6 65 is 
+* 113 9 62 you 
+- 125
+: 128 6 62 Fo
+: 135 6 65 l
+: 142 6 69 low 
+: 149 6 72 the 
+: 156 6 69 so
+: 163 6 67 und 
+: 170 6 65 we 
+: 177 9 62 make 
+- 189
+: 192 6 62 L
+: 199 6 65 et 
+: 206 6 69 ev
+: 213 6 72 ery 
+: 220 6 69 dr
+: 227 6 67 eam 
+: 234 6 65 aw
+* 241 9 62 ake 
+- 253
+E

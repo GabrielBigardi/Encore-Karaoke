@@ -1,0 +1,44 @@
+#TITLE:Golden Hour
+#ARTIST:Encore Originals
+#MP3:instrumental.wav
+#BPM:92
+#GAP:3000
+#GENRE:Dream pop
+#LANGUAGE:English
+: 0 6 60 Su
+: 7 6 64 nl
+: 14 6 67 ig
+: 21 6 69 ht 
+: 28 6 67 up
+: 35 6 64 on 
+: 42 6 62 the 
+: 49 9 60 sea 
+- 61
+: 64 6 60 A 
+: 71 6 64 li
+: 78 6 67 t
+: 85 6 69 tle 
+: 92 6 67 room 
+: 99 6 64 to 
+: 106 6 62 bre
+* 113 9 60 athe 
+- 125
+: 128 6 60 Ev
+: 135 6 64 ery 
+: 142 6 67 no
+: 149 6 69 te 
+: 156 6 67 fe
+: 163 6 64 els 
+: 170 6 62 like 
+: 177 9 60 home 
+- 189
+: 192 6 60 He
+: 199 6 64 re 
+: 206 6 67 we 
+: 213 6 69 are 
+: 220 6 67 ne
+: 227 6 64 ver 
+: 234 6 62 al
+* 241 9 60 one 
+- 253
+E
