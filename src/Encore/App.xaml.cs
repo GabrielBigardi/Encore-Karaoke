@@ -67,7 +67,7 @@ public partial class App : Application
             if(e.Args.Contains("--ui-test"))
             {
                 ShutdownMode=ShutdownMode.OnExplicitShutdown;
-                window.WindowStartupLocation=WindowStartupLocation.Manual;window.Left=-20000;window.Top=-20000;window.ShowInTaskbar=false;window.Show();
+                window.WindowStartupLocation=WindowStartupLocation.Manual;window.Left=-20000;window.Top=-20000;window.ShowInTaskbar=false;window.ShowActivated=false;window.Opacity=0;window.Show();
                 await Task.Delay(1100);
                 var report=await window.RunInteractionTests();
                 File.WriteAllText(Option("--report")??Path.Combine(AppContext.BaseDirectory,"ui-test.json"),System.Text.Json.JsonSerializer.Serialize(report,new System.Text.Json.JsonSerializerOptions{WriteIndented=true}));

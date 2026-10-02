@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     public MainWindow(AppStorage storage)
     {
         this.storage=storage;
-        InitializeComponent(); DataContext=this;
+        InitializeComponent(); WindowWorkArea.Attach(this); DataContext=this;
         GateSlider.Value=storage.Settings.NoiseGate;
         LatencySlider.Value=storage.Settings.LatencyMs;
         VolumeSlider.Value=storage.Settings.Volume;
@@ -472,6 +472,18 @@ public partial class MainWindow : Window
         });
         Test("Performance history renders saved records and summary",()=>{History_Click(this,new());Assert(HistoryList.Items.Count>0&&EmptyHistory.Visibility==Visibility.Collapsed,"History view is empty.");Assert(HistoryBest.Text==0.0.ToString("0.0"),"History summary is wrong.");Library_Click(this,new());});
         Test("Full screen toggles and restores the window layout",()=>{ToggleFullscreen();Assert(SidebarColumn.Width.Value==0&&Sidebar.Visibility==Visibility.Collapsed,"Full screen failed.");ExitFullscreen();Assert(SidebarColumn.Width.Value==208&&Sidebar.Visibility==Visibility.Visible,"Layout was not restored.");});
+        var restoredWidth=ActualWidth;var restoredHeight=ActualHeight;
+        Maximize_Click(this,new());
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        Test("Maximized library fits the monitor work area without clipping",()=>{Assert(WindowState==WindowState.Maximized,"Window did not maximize.");Diagnostics.WindowTests.AssertFitsWorkArea(this,ContentRoot,SingButton);});
+        Maximize_Click(this,new());
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        Test("Restoring a maximized window preserves its size and resize limits",()=>{Assert(WindowState==WindowState.Normal,"Window did not restore.");Assert(Math.Abs(ActualWidth-restoredWidth)<1&&Math.Abs(ActualHeight-restoredHeight)<1,"Restore changed the window size.");Assert(MinWidth==900&&MinHeight==560,"Window resize limits changed.");});
+        PrepareScreenshot("stage");ToggleFullscreen();
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        Test("Expanded stage keeps its bottom controls inside the visible work area",()=>{Assert(WindowState==WindowState.Maximized&&Sidebar.Visibility==Visibility.Collapsed,"Stage did not expand.");Diagnostics.WindowTests.AssertFitsWorkArea(this,ContentRoot,SongProgress,StageHint);});
+        ExitFullscreen();Library_Click(this,new());
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
         Test("Compact window keeps the library and song action usable",()=>{Width=1080;Height=720;UpdateLayout();Assert(HeroRow.Height.Value==160&&SelectedArt.Height==95,"Compact layout not applied.");Assert(SongList.ActualHeight>80,"Library disappeared at the compact window size.");});
         Test("Small laptop window keeps the stage and singing button visible",()=>{Width=900;Height=560;UpdateLayout();Assert(HeroPanel.Visibility==Visibility.Collapsed&&SidebarNote.Visibility==Visibility.Collapsed,"Small layout didn't adapt.");Assert(SongList.ActualHeight>150&&SingButton.ActualHeight>25,"Library or song action disappeared.");PrepareScreenshot("stage");UpdateLayout();Assert(PitchCanvas.ActualHeight>100,"Pitch display disappeared on a small screen.");Library_Click(this,new());});
         Test("Microphone and melody controls display readable labels",()=>{Settings_Click(this,new());MicrophoneBox.ApplyTemplate();TransposeBox.ApplyTemplate();Assert(MicrophoneBox.Text=="Windows default microphone","Microphone label is not readable.");Assert(TransposeBox.Text=="+2 semitones","Melody practice key label is not readable.");Library_Click(this,new());});
