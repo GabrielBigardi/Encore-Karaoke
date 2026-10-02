@@ -436,7 +436,7 @@ public partial class MainWindow : Window
         }
         if(InfoOverlay.Visibility==Visibility.Visible||ResultOverlay.Visibility==Visibility.Visible)return;
         if(e.Key==Key.F11){ToggleFullscreen();e.Handled=true;}
-        else if(e.Key==Key.Space&&currentView=="stage"&&Keyboard.FocusedElement is not TextBox){TogglePause();e.Handled=true;}
+        else if(e.Key==Key.Space&&currentView=="stage"&&Keyboard.FocusedElement is not TextBox){if(!e.IsRepeat)TogglePause();e.Handled=true;}
         else if(e.Key==Key.Enter&&currentView=="library"&&Keyboard.FocusedElement==SongList){StartSong();e.Handled=true;}
     }
     private void ImportHelp_Click(object sender,RoutedEventArgs e)=>ShowInfo("Bring your music to the stage","Each song needs a local audio file and a matching UltraStar .txt chart in the same folder.\n\nUse Add song folder to select your collection. Subfolders are scanned automatically. You can also drop a folder onto Encore, or create a songs folder next to Encore.exe.\n\nWAV, MP3 and OGG work offline. Additional formats depend on the Windows codecs available. Charts support normal, golden and freestyle notes, quarter-beat timing, and lyric breaks.\n\nGolden notes count double. Freestyle lyrics are shown but never scored. Duet charts use the first singer's part. Legacy relative charts need conversion to absolute timing.\n\nEncore includes three original instrumental practice songs. Enable the melody guide in Studio setup to learn their vocal notes.\n\nA regular audio file alone has no reference melody for scoring; it needs a matching chart.");
@@ -502,6 +502,31 @@ public partial class MainWindow : Window
         Test("Small laptop window keeps the stage and singing button visible",()=>{Width=900;Height=560;UpdateLayout();Assert(HeroPanel.Visibility==Visibility.Collapsed&&SidebarNote.Visibility==Visibility.Collapsed,"Small layout didn't adapt.");Assert(SongList.ActualHeight>150&&SingButton.ActualHeight>25,"Library or song action disappeared.");PrepareScreenshot("stage");UpdateLayout();Assert(PitchCanvas.ActualHeight>100,"Pitch display disappeared on a small screen.");Library_Click(this,new());});
         Test("Microphone and melody controls display readable labels",()=>{Settings_Click(this,new());MicrophoneBox.ApplyTemplate();TransposeBox.ApplyTemplate();Assert(MicrophoneBox.Text=="Windows default microphone","Microphone label is not readable.");Assert(TransposeBox.Text=="+2 semitones","Melody practice key label is not readable.");Library_Click(this,new());});
         Test("Refreshing microphones preserves a selected connected device",()=>{if(devices.Count==0)return;MicrophoneBox.SelectedValue=devices[0].Id;var chosen=storage.Settings.MicrophoneId;RefreshMicrophones();Assert(MicrophoneBox.SelectedValue as string==chosen&&storage.Settings.MicrophoneId==chosen,"Microphone selection was reset by refresh.");MicrophoneBox.SelectedValue="";});
+        Test("Holding Space pauses once; another press resumes without an early result",()=>
+        {
+            try
+            {
+                PrepareScreenshot("stage");Volatile.Write(ref performanceState,2);
+                void PressSpace(bool repeat)
+                {
+                    var key=new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(this),Environment.TickCount,Key.Space)
+                    {RoutedEvent=Keyboard.PreviewKeyDownEvent};
+                    // WPF exposes IsRepeat only as a getter. Set its flag on this
+                    // synthetic diagnostic event, without sending system keystrokes.
+                    if(repeat)typeof(KeyEventArgs).GetField("_isRepeat",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!.SetValue(key,true);
+                    Assert(key.IsRepeat==repeat,"The diagnostic key event has the wrong repeat flag.");
+                    RaiseEvent(key);Assert(key.Handled,"Space was not handled by the stage.");
+                }
+                PressSpace(false);
+                Assert(performanceState==3&&PauseOverlay.Visibility==Visibility.Visible,"Space did not pause.");
+                for(var repeat=0;repeat<20;repeat++)PressSpace(true);
+                Assert(performanceState==3&&PauseOverlay.Visibility==Visibility.Visible,"Key repeat toggled playback.");
+                PressSpace(false);
+                Assert(performanceState==2&&PauseOverlay.Visibility==Visibility.Collapsed,"A new Space press did not resume.");
+                Assert(ResultOverlay.Visibility==Visibility.Collapsed&&InfoOverlay.Visibility==Visibility.Collapsed,"Pause/resume produced an early result or error.");
+            }
+            finally{Library_Click(this,new());}
+        });
         Test("The note display receives every distinct frame at 60, 144 and 240 Hz",()=>
         {
             var previousRender=lastRender;

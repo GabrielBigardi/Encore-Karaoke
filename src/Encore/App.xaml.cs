@@ -25,9 +25,16 @@ public partial class App : Application
                 Shutdown(report.Failed==0?0:1);return;
             }
             var dataFolder=Option("--data-dir");
-            if((e.Args.Contains("--ui-test")||e.Args.Contains("--render-test"))&&dataFolder is null)dataFolder=Path.Combine(Path.GetTempPath(),"Encore-ui-test-"+Guid.NewGuid().ToString("N"));
+            if(e.Args.Any(a=>a is "--ui-test" or "--render-test" or "--audio-test" or "--playback-test")&&dataFolder is null)
+                dataFolder=Path.Combine(Path.GetTempPath(),"Encore-test-"+Guid.NewGuid().ToString("N"));
             var storage=new AppStorage(dataFolder);
             storage.InstallDemos();
+            if(e.Args.Contains("--playback-test"))
+            {
+                var report=await PlaybackTests.Run(storage);
+                File.WriteAllText(Option("--report")??Path.Combine(AppContext.BaseDirectory,"playback-test.json"),System.Text.Json.JsonSerializer.Serialize(report,new System.Text.Json.JsonSerializerOptions{WriteIndented=true}));
+                Shutdown(report.Failed==0?0:1);return;
+            }
             if(e.Args.Contains("--audio-test"))
             {
                 var report=await AudioTests.Run(storage);

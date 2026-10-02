@@ -3,7 +3,8 @@ param(
     [string]$Runtime = 'win-x64',
     [switch]$Audio,
     [switch]$Rendering,
-    [switch]$VisibleRendering
+    [switch]$VisibleRendering,
+    [switch]$Playback
 )
 $ErrorActionPreference = 'Stop'
 $encoreRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -22,6 +23,7 @@ $env:DOTNET_MULTILEVEL_LOOKUP = '0'
 $env:DOTNET_BUNDLE_EXTRACT_BASE_DIR = Join-Path $encoreRoot ('.build\bundle-' + $Runtime)
 $encoreChecks = @('self-test','ui-test')
 if ($Audio) { $encoreChecks += 'audio-test' }
+if ($Playback) { $encoreChecks += 'playback-test' }
 if ($Rendering -or $VisibleRendering) { $encoreChecks += 'render-test' }
 foreach ($encoreCheck in $encoreChecks) {
     $encoreReport = Join-Path $encoreReports ($Runtime + '-' + $encoreCheck + '.json')

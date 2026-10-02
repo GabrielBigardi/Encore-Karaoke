@@ -88,6 +88,19 @@ public static class SelfTests
             engine.Advance(1025,reading,1025);for(var i=0;i<100;i++)engine.Advance(1025,reading,1025);
             Assert(engine.Snapshot.Perfect==1,"Paused clock added ticks.");engine.Finish();Assert(engine.Snapshot.Perfect==1,"Finish altered hits.");
         });
+        Test("Unavailable and future audio timestamps cannot jump the playback clock",()=>
+        {
+            Equal(WasapiPlaybackSession.CorrelatePosition(0,0,120000,120000),0);
+            Equal(WasapiPlaybackSession.CorrelatePosition(0,120005,120010,120000),0);
+            Equal(WasapiPlaybackSession.CorrelatePosition(1000,0,120010,120000),1000);
+            Equal(WasapiPlaybackSession.CorrelatePosition(1000,120020,120010,120000),1000);
+        });
+        Test("Audio timestamps from before resume cannot include paused time",()=>
+        {
+            Equal(WasapiPlaybackSession.CorrelatePosition(1000,119000,120010,120000),1000);
+            Equal(WasapiPlaybackSession.CorrelatePosition(1000,119995,120010,120000),1000);
+            Equal(WasapiPlaybackSession.CorrelatePosition(1000,120005,120010,120000),1005);
+        });
         Test("Combo breaks on a miss and retains personal maximum",()=>
         {
             var song=Parse(": 0 4 64 Test");var engine=new ScoreEngine(song);var voice=Voice(song.Notes[0].Pitch);

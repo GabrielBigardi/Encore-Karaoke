@@ -1,30 +1,25 @@
 using System.IO;
 using Encore.Core;
-using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 
 namespace Encore.Services;
 
 /// <summary>Playback position comes from the WASAPI output clock, never the decoder's prefetch position.
-/// Pausing recreates the stream at the frozen position so silence cannot advance the audio clock.</summary>
+/// Native pause retains decoder/resampler buffers and freezes the same stream's device clock.</summary>
 public sealed class AudioPlayer : IDisposable
 {
     private readonly object sync = new();
     private WaveStream? reader;
-    private WasapiOut? output;
-    private MMDevice? device;
+    private WasapiPlaybackSession? output;
     private GuideProvider? provider;
     private Song? song;
-    private double baseMs, frozenMs, lastMs;
-    private bool playing, ended;
-    private int generation;
     private float volume = .7f;
     public bool GuideEnabled { get; set; } = true;
     public int Transpose { get; set; }
     public double DurationMs { get; private set; }
-    public bool Ended { get { lock (sync) return ended; } }
-    public string? Error { get; private set; }
+    public bool Ended { get { lock (sync) return output?.Ended ?? false; } }
+    public string? Error { get { lock (sync) return output?.Error?.Message; } }
     public float Volume { get => volume; set { volume = Math.Clamp(value, 0, 1); if (provider is not null) provider.Volume = volume; } }
     public double PositionMs
     {
@@ -32,14 +27,7 @@ public sealed class AudioPlayer : IDisposable
         {
             lock (sync)
             {
-                if (!playing || output is null) return frozenMs;
-                try
-                {
-                    if (output.PlaybackState == PlaybackState.Playing)
-                        lastMs = Math.Max(lastMs, Math.Min(DurationMs, baseMs + output.GetPosition() * 1000.0 / output.OutputWaveFormat.AverageBytesPerSecond));
-                }
-                catch (Exception e) when (e is System.Runtime.InteropServices.COMException or ObjectDisposedException) { Error = e.Message; }
-                return lastMs;
+                return Math.Min(DurationMs, output?.PositionMs ?? 0);
             }
         }
     }
@@ -56,8 +44,6 @@ public sealed class AudioPlayer : IDisposable
                 Release();
                 throw new InvalidDataException("The audio ends before the chart's final note. Check #BPM, #GAP, and the selected audio file.");
             }
-            baseMs = frozenMs = lastMs = 0;
-            ended = false; Error = null;
         }
     }
     internal static WaveStream OpenReader(string path) => Path.GetExtension(path).ToLowerInvariant() switch
@@ -71,30 +57,12 @@ public sealed class AudioPlayer : IDisposable
     {
         lock (sync)
         {
-            if (reader is null || song is null || playing) return;
-            reader.CurrentTime = TimeSpan.FromMilliseconds(frozenMs);
-            baseMs = lastMs = frozenMs;
-            var captureGeneration = ++generation;
-            using var enumerator = new MMDeviceEnumerator();
-            device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            output = new WasapiOut(device, AudioClientShareMode.Shared, true, 40);
-            provider = new GuideProvider(reader.ToSampleProvider(), song, baseMs, GuideEnabled, Transpose) { Volume = volume };
-            output.Init(provider.ToWaveProvider());
-            output.PlaybackStopped += (_, args) =>
+            if (reader is null || song is null) return;
+            if (output is null)
             {
-                ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    lock (sync)
-                    {
-                        if (captureGeneration != generation) return;
-                        Error = args.Exception?.Message;
-                        frozenMs = args.Exception is null ? DurationMs : lastMs;
-                        playing = false;
-                        ended = args.Exception is null;
-                    }
-                });
-            };
-            playing = true;
+                provider = new GuideProvider(reader.ToSampleProvider(), song, 0, GuideEnabled, Transpose) { Volume = volume };
+                output = new WasapiPlaybackSession(provider);
+            }
             output.Play();
         }
     }
@@ -102,18 +70,12 @@ public sealed class AudioPlayer : IDisposable
     {
         lock (sync)
         {
-            frozenMs = PositionMs;
-            playing = false;
-            ++generation;
-            output?.Stop(); output?.Dispose(); output = null;
-            device?.Dispose(); device = null;
+            output?.Pause();
         }
     }
     private void Release()
     {
-        ++generation; playing = false;
-        output?.Stop(); output?.Dispose(); output = null;
-        device?.Dispose(); device = null;
+        output?.Dispose(); output = null; provider = null;
         reader?.Dispose(); reader = null;
     }
     public void Dispose() { lock (sync) Release(); }

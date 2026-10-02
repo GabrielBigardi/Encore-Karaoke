@@ -44,7 +44,7 @@ The included songsâ€”**Neon Skyline**, **Golden Hour**, and **Midnight Bloom**â€
 - The **song score** shows points earned toward the final total. **Accuracy** shows your hit rate for the scored portions already played.
 - Your combo counts consecutive successful 50 ms note slices.
 
-Press **Space** to pause/resume, **F11** to expand the window, and **Escape** to leave the stage or close an overlay. Returning to the library ends an unfinished session; only completed performances are saved.
+Press **Space** to pause/resume, **F11** to expand the window, and **Escape** to leave the stage or close an overlay. Each Space press toggles playback once; holding it does not repeat the action. Returning to the library ends an unfinished session; only completed performances are saved.
 
 ## Studio setup
 
