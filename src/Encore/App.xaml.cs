@@ -25,7 +25,7 @@ public partial class App : Application
                 Shutdown(report.Failed==0?0:1);return;
             }
             var dataFolder=Option("--data-dir");
-            if(e.Args.Contains("--ui-test")&&dataFolder is null)dataFolder=Path.Combine(Path.GetTempPath(),"Encore-ui-test-"+Guid.NewGuid().ToString("N"));
+            if((e.Args.Contains("--ui-test")||e.Args.Contains("--render-test"))&&dataFolder is null)dataFolder=Path.Combine(Path.GetTempPath(),"Encore-ui-test-"+Guid.NewGuid().ToString("N"));
             var storage=new AppStorage(dataFolder);
             storage.InstallDemos();
             if(e.Args.Contains("--audio-test"))
@@ -63,6 +63,16 @@ public partial class App : Application
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(screenshot))!);
                 using(var file=File.Create(screenshot)){var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));encoder.Save(file);}
                 window.Close();Shutdown();return;
+            }
+            if(e.Args.Contains("--render-test"))
+            {
+                ShutdownMode=ShutdownMode.OnExplicitShutdown;
+                window.ShowInTaskbar=false;window.ShowActivated=false;window.Opacity=e.Args.Contains("--render-visible")?1:0;window.Show();
+                window.WindowState=WindowState.Maximized;
+                await Task.Delay(1100);
+                var report=await window.RunRenderingTest();
+                File.WriteAllText(Option("--report")??Path.Combine(AppContext.BaseDirectory,"render-test.json"),System.Text.Json.JsonSerializer.Serialize(report,new System.Text.Json.JsonSerializerOptions{WriteIndented=true}));
+                window.Close();Shutdown(report.Passed?0:1);return;
             }
             if(e.Args.Contains("--ui-test"))
             {

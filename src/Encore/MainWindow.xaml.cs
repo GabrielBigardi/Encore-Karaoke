@@ -49,7 +49,7 @@ public partial class MainWindow : Window
     private readonly Stopwatch countdown=new();
     private readonly Stopwatch micTestClock=new();
     private readonly Stopwatch toastClock=new();
-    private TimeSpan lastRender=TimeSpan.Zero;
+    private TimeSpan? lastRender, lastStatusUpdate;
     private WindowState beforeFullscreen;
     private bool captureUnavailable;
     private string currentView="library";
@@ -297,13 +297,24 @@ public partial class MainWindow : Window
     }
     private void Render(object? sender,EventArgs e)
     {
-        if(e is not RenderingEventArgs render||render.RenderingTime-lastRender<TimeSpan.FromMilliseconds(15))return;
-        lastRender=render.RenderingTime;
+        if(e is RenderingEventArgs render)RenderFrame(render.RenderingTime);
+    }
+    private void RenderFrame(TimeSpan renderingTime)
+    {
+        // WPF schedules this callback with the Windows compositor. Only suppress
+        // a repeated callback for the same frame; faster monitors need every frame.
+        if(renderingTime==lastRender||WindowState==WindowState.Minimized)return;
+        lastRender=renderingTime;
+        var updateStatus=lastStatusUpdate is null||renderingTime<lastStatusUpdate||renderingTime-lastStatusUpdate>=TimeSpan.FromMilliseconds(50);
+        if(updateStatus)lastStatusUpdate=renderingTime;
         if(Toast.Visibility==Visibility.Visible&&toastClock.Elapsed.TotalSeconds>5)Toast.Visibility=Visibility.Collapsed;
         if(micTest&&microphone is not null)
         {
-            var reading=FreshReading();TunerNote.Text=reading.NoteName;TunerHz.Text=reading.Voiced?$"{reading.Frequency:0.0} Hz":"Hum a steady note";
-            TestMicLevel.Value=reading.Rms;TunerQuality.Text=reading.Voiced?$"{reading.Confidence:P0} pitch confidence":reading.Rms<storage.Settings.NoiseGate?"Below your noise filter. Sing a little louder.":"Listening for a clear, sustained pitch.";
+            if(updateStatus)
+            {
+                var reading=FreshReading();TunerNote.Text=reading.NoteName;TunerHz.Text=reading.Voiced?$"{reading.Frequency:0.0} Hz":"Hum a steady note";
+                TestMicLevel.Value=reading.Rms;TunerQuality.Text=reading.Voiced?$"{reading.Confidence:P0} pitch confidence":reading.Rms<storage.Settings.NoiseGate?"Below your noise filter. Sing a little louder.":"Listening for a clear, sustained pitch.";
+            }
             if(microphone.Error is not null){var reason=microphone.Error;StopMicTest();ShowMicrophoneError(reason);}
         }
         var state=Volatile.Read(ref performanceState);
@@ -326,17 +337,20 @@ public partial class MainWindow : Window
         }
         if(audio.Error is not null){var reason=audio.Error;StopPerformance();ShowInfo("Playback interrupted",reason);return;}
         var time=audio.PositionMs;
-        var snapshot=scoring?.Snapshot;
         var readingNow=state==2?FreshReading():PitchReading.Silent();
         PitchCanvas.Update(activeSong,time,new(microphone?.Latest.TimeMs??time,readingNow),storage.Settings.Transpose);
-        if(snapshot is not null)
-        {
-            LiveScore.Text=snapshot.Score.ToString("0.0");ComboText.Text=$"{snapshot.Combo} ×";AccuracyText.Text=$"{snapshot.Accuracy:0}% accuracy";
-            HitFeedback.Text=activeSong?.Notes.Any(n=>n.Scored&&n.StartMs<=time&&n.EndMs>time)==true?snapshot.Feedback:"Instrumental";
-        }
-        PitchText.Text=readingNow.NoteName;StageMicLevel.Value=readingNow.Rms;
-        SongProgress.Value=audio.DurationMs>0?time/audio.DurationMs*100:0;StageTime.Text=$"{FormatTime(time)} / {FormatTime(audio.DurationMs)}";
         UpdateLyrics(time);
+        if(updateStatus)
+        {
+            var snapshot=scoring?.Snapshot;
+            if(snapshot is not null)
+            {
+                LiveScore.Text=snapshot.Score.ToString("0.0");ComboText.Text=$"{snapshot.Combo} ×";AccuracyText.Text=$"{snapshot.Accuracy:0}% accuracy";
+                HitFeedback.Text=activeSong?.Notes.Any(n=>n.Scored&&n.StartMs<=time&&n.EndMs>time)==true?snapshot.Feedback:"Instrumental";
+            }
+            PitchText.Text=readingNow.NoteName;StageMicLevel.Value=readingNow.Rms;
+            SongProgress.Value=audio.DurationMs>0?time/audio.DurationMs*100:0;StageTime.Text=$"{FormatTime(time)} / {FormatTime(audio.DurationMs)}";
+        }
         if(state==2&&audio.Ended)FinishPerformance();
     }
     private PitchReading FreshReading()
@@ -488,7 +502,37 @@ public partial class MainWindow : Window
         Test("Small laptop window keeps the stage and singing button visible",()=>{Width=900;Height=560;UpdateLayout();Assert(HeroPanel.Visibility==Visibility.Collapsed&&SidebarNote.Visibility==Visibility.Collapsed,"Small layout didn't adapt.");Assert(SongList.ActualHeight>150&&SingButton.ActualHeight>25,"Library or song action disappeared.");PrepareScreenshot("stage");UpdateLayout();Assert(PitchCanvas.ActualHeight>100,"Pitch display disappeared on a small screen.");Library_Click(this,new());});
         Test("Microphone and melody controls display readable labels",()=>{Settings_Click(this,new());MicrophoneBox.ApplyTemplate();TransposeBox.ApplyTemplate();Assert(MicrophoneBox.Text=="Windows default microphone","Microphone label is not readable.");Assert(TransposeBox.Text=="+2 semitones","Melody practice key label is not readable.");Library_Click(this,new());});
         Test("Refreshing microphones preserves a selected connected device",()=>{if(devices.Count==0)return;MicrophoneBox.SelectedValue=devices[0].Id;var chosen=storage.Settings.MicrophoneId;RefreshMicrophones();Assert(MicrophoneBox.SelectedValue as string==chosen&&storage.Settings.MicrophoneId==chosen,"Microphone selection was reset by refresh.");MicrophoneBox.SelectedValue="";});
+        Test("The note display receives every distinct frame at 60, 144 and 240 Hz",()=>
+        {
+            var previousRender=lastRender;
+            try
+            {
+                activeSong=selectedSong;audio.Load(activeSong!);PrepareScreenshot("stage");Volatile.Write(ref performanceState,2);
+                foreach(var rate in new[]{60,144,240})
+                {
+                    lastRender=null;
+                    var before=PitchCanvas.FrameUpdates;
+                    for(var frame=1;frame<=rate;frame++)
+                    {
+                        var presentationTime=TimeSpan.FromTicks(TimeSpan.TicksPerSecond*frame/rate);
+                        RenderFrame(presentationTime);RenderFrame(presentationTime);
+                    }
+                    Assert(PitchCanvas.FrameUpdates-before==rate,$"At {rate} Hz, {PitchCanvas.FrameUpdates-before} of {rate} distinct frames reached the note display.");
+                }
+            }
+            finally{StopPerformance();Library_Click(this,new());lastRender=previousRender;}
+        });
         await Task.Delay(50);
         return new(tests.Count(t=>t.Passed),tests.Count(t=>!t.Passed),stopwatch.Elapsed.TotalMilliseconds,tests);
+    }
+    internal async Task<Diagnostics.RenderingTestReport> RunRenderingTest()
+    {
+        try
+        {
+            PrepareScreenshot("stage");audio.Load(activeSong!);audio.Volume=0;audio.GuideEnabled=false;
+            audio.Play();Volatile.Write(ref performanceState,2);
+            return await Diagnostics.RenderingTests.Run(PitchCanvas);
+        }
+        finally{StopPerformance();}
     }
 }

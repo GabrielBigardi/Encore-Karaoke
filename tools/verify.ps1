@@ -1,7 +1,9 @@
 param(
     [ValidateSet('win-x64','win-x86')]
     [string]$Runtime = 'win-x64',
-    [switch]$Audio
+    [switch]$Audio,
+    [switch]$Rendering,
+    [switch]$VisibleRendering
 )
 $ErrorActionPreference = 'Stop'
 $encoreRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -20,11 +22,13 @@ $env:DOTNET_MULTILEVEL_LOOKUP = '0'
 $env:DOTNET_BUNDLE_EXTRACT_BASE_DIR = Join-Path $encoreRoot ('.build\bundle-' + $Runtime)
 $encoreChecks = @('self-test','ui-test')
 if ($Audio) { $encoreChecks += 'audio-test' }
+if ($Rendering -or $VisibleRendering) { $encoreChecks += 'render-test' }
 foreach ($encoreCheck in $encoreChecks) {
     $encoreReport = Join-Path $encoreReports ($Runtime + '-' + $encoreCheck + '.json')
     $encoreData = Join-Path $encoreRoot ('.build\verify-' + $Runtime + '-' + $encoreCheck + '-' + [Guid]::NewGuid().ToString('N'))
     $encoreError = Join-Path $encoreReports ($Runtime + '-' + $encoreCheck + '-error.txt')
     $encoreArguments = @(('--' + $encoreCheck), ('--report="' + $encoreReport + '"'), ('--data-dir="' + $encoreData + '"'), ('--error-log="' + $encoreError + '"'))
+    if ($encoreCheck -eq 'render-test' -and $VisibleRendering) { $encoreArguments += '--render-visible' }
     $encoreProcess = Start-Process -FilePath $encoreExecutable -ArgumentList $encoreArguments -WindowStyle Hidden -PassThru
     if (-not $encoreProcess.WaitForExit(45000)) { $encoreProcess.Kill(); throw "Timed out: $encoreCheck" }
     if ($encoreProcess.ExitCode -ne 0) {
@@ -33,6 +37,6 @@ foreach ($encoreCheck in $encoreChecks) {
         throw "Check failed: $encoreCheck (exit $($encoreProcess.ExitCode))"
     }
     $encoreResult = Get-Content -LiteralPath $encoreReport -Encoding utf8 -Raw | ConvertFrom-Json
-    if ($encoreResult.Failed -gt 0 -or ($encoreCheck -eq 'audio-test' -and -not $encoreResult.Passed)) { throw "Report failed: $encoreCheck" }
+    if ($encoreResult.Failed -gt 0 -or ($encoreCheck -in @('audio-test','render-test') -and -not $encoreResult.Passed)) { throw "Report failed: $encoreCheck" }
     Write-Output ($Runtime + ' / ' + $encoreCheck + ': passed')
 }
